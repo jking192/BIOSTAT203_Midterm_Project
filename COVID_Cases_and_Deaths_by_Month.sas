@@ -13,6 +13,7 @@ proc sort DATA= mid.data;
    by submission_date;
 RUN;
 
+#Aggregation by Month
 proc sql;
 	create table test as
 	select state, put(submission_date,yymmd5.) as month, SUM(tot_cases) as total_cases,
@@ -24,7 +25,7 @@ proc sql;
 	from MID.Data
 	group by state, month;
 quit;
-
+#Missing Values
 data mid.final_table;
 	set test;
 	if confirmed_cases = . then confirmed_cases = 0;
