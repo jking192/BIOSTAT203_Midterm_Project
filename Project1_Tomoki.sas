@@ -1,7 +1,7 @@
 libname MID "/home/u59569301/Biostat203A/Prj1";
 
 PROC IMPORT OUT = MID.case_data
-	DATAFILE="/home/u59569301/Biostat203A/Prj1/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv"
+	DATAFILE="/home/u59569301/Biostat203A/Prj1/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time_add_pop.csv"
 	DBMS=CSV REPLACE;
 	GETNAMES=YES;
 	DATAROW= 2;
@@ -33,7 +33,8 @@ proc sql;
 	SUM (prob_cases) as probable_cases, SUM (new_case) as new_cases,
 	SUM (pnew_case) as probable_new_cases, SUM (tot_death) as total_deaths, SUM (conf_death) as confirmed_deaths,
 	SUM (prob_death) as probable_deaths, SUM (new_death) as new_deaths, 
-	SUM (pnew_death) as probable_new_deaths
+	SUM (pnew_death) as probable_new_deaths,
+	AVG (population) as population
 	from MID.case_data
 	group by state, month;
 quit;
@@ -61,10 +62,19 @@ data mid.vacc_sum_table;
 run;
 
 data MID.merge_table;
-merge mid.case_sum_table
-	  mid.vacc_sum_table (rename = (recip_state=state));
-by state month;
+	merge mid.case_sum_table
+	 	 mid.vacc_sum_table (rename = (recip_state=state));
+ 	/*format case_to_vacc 2.;*/
+	by state month;
+run;
+
+data MID.merge_table;
+	set MID.merge_table;
 run;
 
 PROC CONTENTS DATA=MID.merge_table; RUN;
-PROC print data = MID.merge_table (obs = 5);
+
+proc sgplot data = mid.merge_table;
+	where fully_vaccinated is not missing;
+	vbox fully_vaccinated / category=month;
+run;
