@@ -113,6 +113,7 @@ proc univariate data=mid1.final_merge normal;
  * Ranked Sum Test;
   proc NPAR1WAY data=mid1.final_merge wilcoxon;
 	class indicator;
+	format indicator $status.;
 	var new_case_rate_percent;
 	exact wilcoxon;
    run;
