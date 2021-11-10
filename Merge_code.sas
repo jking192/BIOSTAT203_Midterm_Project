@@ -1,5 +1,5 @@
 libname MID "/home/u59569301/Biostat203A/Prj1";
-
+*Import datasets;
 PROC IMPORT OUT = MID.case_data
 	DATAFILE="/home/u59569301/Biostat203A/Prj1/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time_add_pop.csv"
 	DBMS=CSV REPLACE;
@@ -30,6 +30,7 @@ proc print data = MID.vacc_data;
 where recip_state = "HI";
 RUN;
 
+*Ensure totals are shown as end-of-month totals except for October since data used was as of October 28th;
 data mid.case_data_edit;
   set mid.case_data;
   if submission_date < =22553 then
@@ -48,19 +49,7 @@ proc sql;
    order by state, month;
 quit;   
 
-/*proc sql;
-	create table test as
-	select state, put(submission_date,yymmd5.) as month, SUM(tot_cases) as total_cases,
-	SUM (conf_cases) as confirmed_cases, 
-	SUM (prob_cases) as probable_cases, SUM (new_case) as new_cases,
-	SUM (pnew_case) as probable_new_cases, SUM (tot_death) as total_deaths, SUM (conf_death) as confirmed_deaths,
-	SUM (prob_death) as probable_deaths, SUM (new_death) as new_deaths, 
-	SUM (pnew_death) as probable_new_deaths,
-	AVG (population) as population
-	from MID.case_data
-	group by state, month;
-quit;*/
-
+*Include population variable and sum new cases by month;
 proc sql;
 	create table test as
 	select state, put(submission_date,yymmd5.) as month,
@@ -71,11 +60,13 @@ proc sql;
 	group by state, month;
 quit;
 
+*Merge tables for final table with case and death data;
 data mid.first_table;
      merge test final;
      by state month;
 run;   
 
+*Ensure county vaccination data totals are from end of each monthm except for October since data used was as of October 28th;
 data mid.vacc_data_edit;
   set mid.vacc_data;
   if date < =22553 then
@@ -84,6 +75,7 @@ data mid.vacc_data_edit;
   format last_day MMDDYY10.;
 RUN;   
 
+*Aggregate county vaccination totals for each state at end of each month;
 proc sql;
    create table test2 as
    select Recip_state as state, put(date,yymmd5.) as month, 
@@ -96,81 +88,16 @@ proc sql;
    group by state, month;
 quit;  
 
-PROC IMPORT OUT = MID.abbrev
-	DATAFILE="/home/u59569301/Biostat203A/Prj1/State_Abbreviation.csv"
-	DBMS=CSV REPLACE;
-	GETNAMES=YES;
-	DATAROW= 2;
-RUN;
-
-PROC IMPORT OUT = MID.data3
-	DATAFILE="/home/u59569301/Biostat203A/Prj1/Provisional_COVID-19_Deaths__Distribution_of_Deaths_by_Race_and_Hispanic_Origin.csv"
-	DBMS=CSV REPLACE;
-	GETNAMES=YES;
-	DATAROW= 2;
-RUN;
-
-proc sql;
- 	delete from MID.data3
- 	where month =. or state = "United States";
-quit;
-
-PROC CONTENTS DATA=MID.Data3; RUN;
-proc sort Data = mid.data3;
-    by state;
-run;
-proc sort Data = mid.abbrev;
-    by state;
-run;        
-data mid.table_3;
-  merge mid.data3 mid.abbrev;
-  by State;
-run;
-
-data mid.table_3_interim;
-    set mid.table_3;
-    date = mdy (month,1,year);
-   drop state;
-   *rename "Non-Hispanic White"n=white;
-run;
-proc sql;
-    create table test as
-    select "Non-Hispanic White"n
-    from mid.table_3_interim;
-quit;
-proc sql;
-    create table mid.table_3_final as
-    select Postal as state, put (date, yymmd5.) as month, Indicator, "Non-Hispanic White"n as white, "Non-Hispanic Black or African Am"n as african_american,
-    "Non-Hispanic American Indian or"n as native_american, 'Non-Hispanic Asian'n as asian,
-    'Non-Hispanic Native Hawaiian or'n as native_Hawaiian, 'Non Hispanic more than one race'n as multiracial,
-    'Hispanic or Latino'n as Hispanic_or_Latino
-    from mid.table_3_interim
-    order by state, month;
-quit;
-    
-proc sql;
- 	delete from MID.table_3_final
- 	where state is missing or white is not missing;
-quit;
-
-proc print data= mid.table_3_final; 
+ 
 
 data mid.second_table;
 	set test2;
 run;
 
+*Merge case and death data with vaccination data;
 data MID.merge_table;
 	merge mid.first_table
 	 	  mid.second_table; /*(rename = (recip_state=state));*/
  	/*format case_to_vacc 2.;*/
 	by state month;
 run;
-
-data MID.merge_table;
-	merge MID.merge_table
-	 	  mid.table_3_final; /*(rename = (recip_state=state));*/
- 	/*format case_to_vacc 2.;*/
-	by state month;
-run;
-
-PROC CONTENTS DATA=MID.merge_table; RUN;
